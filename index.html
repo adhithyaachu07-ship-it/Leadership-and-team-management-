@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Management System</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f1f5f9;color:#1e293b}
+header{background:#1e3a8a;color:white;padding:24px;text-align:center}
+header p{margin-top:8px;color:#dbeafe}
+.container{max-width:1100px;margin:25px auto;padding:0 18px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:25px}
+.stat-card,.panel{background:white;padding:20px;border-radius:12px;box-shadow:0 3px 12px #0000000d}
+.stat-card h3{font-size:14px;color:#64748b;margin-bottom:12px}
+.stat-card p{font-size:28px;font-weight:bold;color:#1d4ed8}
+.panel{margin-bottom:22px}
+h2{font-size:20px;margin-bottom:18px}
+.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
+input,select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:7px;margin-top:7px;font-size:14px;background:white}
+label{font-size:14px;font-weight:bold}
+button{padding:11px 16px;border:none;border-radius:7px;cursor:pointer;font-weight:bold;margin-top:15px}
+.primary{background:#2563eb;color:white}.primary:hover{background:#1d4ed8}
+.delete{background:#fee2e2;color:#b91c1c;margin:0}
+.filters{display:flex;gap:12px;margin-bottom:18px}.filters select{max-width:240px}
+.task-list{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
+.task{border:1px solid #e2e8f0;border-radius:10px;padding:17px;background:#fff}
+.task h3{margin-bottom:12px;overflow-wrap:anywhere}
+.task p{font-size:14px;color:#64748b;margin:8px 0;overflow-wrap:anywhere}
+.task-top{display:flex;justify-content:space-between;gap:8px;align-items:start}
+.badge{padding:5px 8px;border-radius:20px;font-size:11px;font-weight:bold;white-space:nowrap}
+.Pending{background:#fef3c7;color:#92400e}.Ongoing{background:#dbeafe;color:#1d4ed8}.Completed{background:#dcfce7;color:#166534}
+.progress{background:#e2e8f0;height:8px;border-radius:10px;margin:12px 0;overflow:hidden}
+.progress div{background:#2563eb;height:100%}
+.task-actions{display:flex;gap:8px;flex-wrap:wrap}.task-actions button{margin-top:8px;font-size:12px}
+.empty{color:#64748b;text-align:center;padding:25px;grid-column:1/-1}
+footer{text-align:center;padding:22px;color:#64748b;font-size:13px}
+@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.form-grid,.task-list{grid-template-columns:1fr}.filters{flex-direction:column}.filters select{max-width:none}}
+</style>
+</head>
+<body>
+<header><h1>Team Management System</h1><p>Leadership, Collaboration and Task Management</p></header>
+<main class="container">
+<section class="stats">
+<div class="stat-card"><h3>Total Tasks</h3><p id="totalTasks">0</p></div>
+<div class="stat-card"><h3>Pending Tasks</h3><p id="pendingTasks">0</p></div>
+<div class="stat-card"><h3>Ongoing Tasks</h3><p id="ongoingTasks">0</p></div>
+<div class="stat-card"><h3>Completed Tasks</h3><p id="completedTasks">0</p></div>
+</section>
+<section class="panel">
+<h2>Add Team Member</h2>
+<form id="memberForm"><div class="form-grid">
+<div><label for="memberName">Member Name</label><input id="memberName" required placeholder="Enter member name" maxlength="60"></div>
+<div><label for="memberRole">Role</label><select id="memberRole" required><option value="">Select role</option><option>Team Leader</option><option>Project Manager</option><option>Developer</option><option>Designer</option><option>Researcher</option><option>Team Member</option></select></div>
+</div><button class="primary" type="submit">Add Member</button></form>
+<p id="memberMessage" role="status" style="margin-top:12px"></p>
+<h3 style="margin-top:20px">Team Members</h3><div id="memberList"></div>
+</section>
+<section class="panel">
+<h2>Assign New Task</h2>
+<form id="taskForm"><div class="form-grid">
+<div><label for="taskTitle">Task Title</label><input id="taskTitle" required maxlength="100" placeholder="Enter task title"></div>
+<div><label for="assignedTo">Assign To</label><select id="assignedTo" required><option value="">Add a team member first</option></select></div>
+<div><label for="deadline">Deadline</label><input type="date" id="deadline" required></div>
+<div><label for="priority">Priority</label><select id="priority"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
+<div><label for="taskStatus">Initial Status</label><select id="taskStatus"><option>Pending</option><option>Ongoing</option><option>Completed</option></select></div>
+<div><label for="description">Description</label><input id="description" maxlength="200" placeholder="Task details"></div>
+</div><button class="primary" type="submit">Assign Task</button></form>
+<p id="taskMessage" role="status" style="margin-top:12px"></p>
+</section>
+<section class="panel"><h2>Manage Tasks</h2>
+<div class="filters"><select id="filterStatus" aria-label="Filter by status"><option value="All">All Statuses</option><option>Pending</option><option>Ongoing</option><option>Completed</option></select>
+<select id="filterMember" aria-label="Filter by team member"><option value="All">All Team Members</option></select></div>
+<div id="taskList" class="task-list"></div>
+</section>
+</main>
+<footer>Leadership and Team Management Project</footer>
+<script>
+const $ = id => document.getElementById(id);
+let members = [], tasks = [];
+try {
+  members = JSON.parse(localStorage.getItem("teamMembers") || "[]");
+  tasks = JSON.parse(localStorage.getItem("teamTasks") || "[]");
+  if (!Array.isArray(members)) members = [];
+  if (!Array.isArray(tasks)) tasks = [];
+} catch (error) { members = []; tasks = []; }
+function saveData() {
+  try {
+    localStorage.setItem("teamMembers", JSON.stringify(members));
+    localStorage.setItem("teamTasks", JSON.stringify(tasks));
+  } catch (error) { alert("Unable to save data in this browser."); }
+}
+$("memberForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+  const name = $("memberName").value.trim(), role = $("memberRole").value;
+  if (!name || !role) return;
+  members.push({id: Date.now() + Math.random(), name, role});
+  saveData(); this.reset();
+  $("memberMessage").textContent = "Team member added successfully!";
+  render();
+});
+$("taskForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+  const title = $("taskTitle").value.trim();
+  const memberId = Number($("assignedTo").value);
+  const member = members.find(m => m.id === memberId);
+  if (!title || !member) {
+    $("taskMessage").textContent = "Please add a member and select an assignee.";
+    return;
+  }
+  tasks.push({id: Date.now() + Math.random(), title, memberId,
+    deadline: $("deadline").value, priority: $("priority").value,
+    status: $("taskStatus").value, description: $("description").value.trim()});
+  saveData(); this.reset();
+  $("taskMessage").textContent = "Task assigned successfully!";
+  render();
+});
+function updateStatus(id, status) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  task.status = status; saveData(); render();
+}
+function deleteTask(id) {
+  if (!confirm("Are you sure you want to delete this task?")) return;
+  tasks = tasks.filter(t => t.id !== id); saveData(); render();
+}
+function deleteMember(id) {
+  if (tasks.some(t => t.memberId === id)) {
+    alert("Reassign or delete this member's tasks first."); return;
+  }
+  if (!confirm("Remove this team member?")) return;
+  members = members.filter(m => m.id !== id); saveData(); render();
+}
+function makeElement(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+function addButton(parent, text, className, action) {
+  const button = makeElement("button", className, text);
+  button.type = "button"; button.addEventListener("click", action);
+  parent.appendChild(button);
+}
+function render() {
+  $("totalTasks").textContent = tasks.length;
+  $("pendingTasks").textContent = tasks.filter(t => t.status === "Pending").length;
+  $("ongoingTasks").textContent = tasks.filter(t => t.status === "Ongoing").length;
+  $("completedTasks").textContent = tasks.filter(t => t.status === "Completed").length;
+  const assignedTo = $("assignedTo"), filterMember = $("filterMember");
+  const previousAssignee = assignedTo.value, previousFilter = filterMember.value;
+  assignedTo.replaceChildren(); filterMember.replaceChildren();
+  assignedTo.add(new Option(members.length ? "Select member" : "Add a team member first", ""));
+  filterMember.add(new Option("All Team Members", "All"));
+  members.forEach(member => {
+    assignedTo.add(new Option(member.name, String(member.id)));
+    filterMember.add(new Option(member.name, String(member.id)));
+  });
+  if (members.some(m => String(m.id) === previousAssignee)) assignedTo.value = previousAssignee;
+  if (previousFilter === "All" || members.some(m => String(m.id) === previousFilter))
+    filterMember.value = previousFilter || "All";
+  const memberList = $("memberList"); memberList.replaceChildren();
+  if (!members.length) memberList.appendChild(makeElement("p", "empty", "No team members added yet."));
+  members.forEach(member => {
+    const row = makeElement("div");
+    row.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #e2e8f0;";
+    row.appendChild(makeElement("span", "", member.name + " — " + member.role));
+    addButton(row, "Remove", "delete", () => deleteMember(member.id));
+    memberList.appendChild(row);
+  });
+  const statusFilter = $("filterStatus").value, memberFilter = filterMember.value;
+  const filteredTasks = tasks.filter(task =>
+    (statusFilter === "All" || task.status === statusFilter) &&
+    (memberFilter === "All" || String(task.memberId) === memberFilter));
+  const taskList = $("taskList"); taskList.replaceChildren();
+  if (!filteredTasks.length) taskList.appendChild(makeElement("p", "empty", "No tasks found. Add a team member and assign a task."));
+  filteredTasks.forEach(task => {
+    const card = makeElement("article", "task"), top = makeElement("div", "task-top");
+    top.appendChild(makeElement("h3", "", task.title));
+    top.appendChild(makeElement("span", "badge " + task.status, task.status));
+    card.appendChild(top);
+    const member = members.find(m => m.id === task.memberId);
+    card.appendChild(makeElement("p", "", "Assigned to: " + (member ? member.name : "Unknown member")));
+    card.appendChild(makeElement("p", "", "Deadline: " + task.deadline));
+    card.appendChild(makeElement("p", "", "Priority: " + task.priority));
+    if (task.description) card.appendChild(makeElement("p", "", task.description));
+    const progress = makeElement("div", "progress"), bar = makeElement("div");
+    bar.style.width = task.status === "Completed" ? "100%" : task.status === "Ongoing" ? "50%" : "0%";
+    progress.appendChild(bar); card.appendChild(progress);
+    const actions = makeElement("div", "task-actions");
+    const nextStatus = task.status === "Pending" ? "Ongoing" : task.status === "Ongoing" ? "Completed" : "Pending";
+    addButton(actions, "Set " + nextStatus, "primary", () => updateStatus(task.id, nextStatus));
+    addButton(actions, "Delete Task", "delete", () => deleteTask(task.id));
+    card.appendChild(actions); taskList.appendChild(card);
+  });
+}
+$("filterStatus").addEventListener("change", render);
+$("filterMember").addEventListener("change", render);
+const today = new Date();
+const localToday = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+$("deadline").value = localToday;
+$("deadline").min = localToday;
+render();
+</script>
+</body>
+</html>
